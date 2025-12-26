@@ -7,7 +7,7 @@ An exporter and recolor tool for SWFs.
 
 * [Node.js](https://nodejs.org/en/)
 * [Java](https://www.java.com/en/download/)
-* [JPEXS Free Flash Decompiler](https://github.com/jindrapetrik/jpexs-decompiler)
+* [JPEXS Free Flash Decompiler](https://github.com/jindrapetrik/jpexs-decompiler) (v.24.1.1 nightly build 3364, or higher)
 * [Texture Packer](https://www.codeandweb.com/texturepacker) (when opting to automatically pack)
 
 ### Installation
@@ -41,7 +41,7 @@ The `.env` file has 4 variables that need set, most of which already have defaul
 
 In its most basic form, you can run this command to run the exporter:
 ```console
-npm run dev -- path/to/item.swf
+npm run export -- path/to/item.swf
 ```
 However, this can take a few arguments:
 - `--dontpack` (shorthand `--dp`) - Tells the exporter to not pack the files with TexturePacker. This will also not delete the individual frame PNGs when the process is done.
@@ -51,8 +51,8 @@ However, this can take a few arguments:
 
 Examples:
 ```console
-npm run dev -- ../relative/path/to/item.swf --dontpack --sl 8:5,12:4
-npm run dev -- /absolute/path/to/item.swf --so --od /path/to/desired/directory
+npm run export -- ../relative/path/to/item.swf --dontpack --sl 8:5,12:4
+npm run export -- /absolute/path/to/item.swf --so --od /path/to/desired/directory
 ```
 
 The exports can be found in the `exports` directory in the root of this repository, where each subdirectory is the SWF name. The individual frame PNGs will always go here, however the directory of the texture sheet can be defined with `--outputdir`/`--od` when running the command.
