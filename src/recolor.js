@@ -168,6 +168,7 @@ try {
 
             if (Object.keys(recolorMap).length < 1) {
                 console.log('No changes were made to the SWF.')
+                await fs.rm(path.join(__dirname, tempDir), { recursive: true })
                 return
             }
 
