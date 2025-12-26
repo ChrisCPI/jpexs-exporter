@@ -47,10 +47,11 @@ However, this can take a few arguments:
 - `--dontpack` (shorthand `--dp`) - Tells the exporter to not pack the files with TexturePacker. This will also not delete the individual frame PNGs when the process is done.
 - `--saveoutput` (shorthand `--so`) - Tells the exporter to not delete the individual frame PNGs when the process is done. Setting `--dontpack` also does this.
 - `--outputdir` (shorthand `--od`) - Output the finished texture sheet into this directory instead of in exports/{swf name}/.
+- `--sublengths` (shorthand `--sl`) - Define a map of sublengths, to define how many subframes of a particular frame of the SWF to export. This is in the format of "{frame}:{sublength}", each separated by commas. (Example: "`26:24`" will export 24 frames of frame 26.)
 
 Examples:
 ```console
-npm run dev -- ../relative/path/to/item.swf --dontpack
+npm run dev -- ../relative/path/to/item.swf --dontpack --sl 8:5,12:4
 npm run dev -- /absolute/path/to/item.swf --so --od /path/to/desired/directory
 ```
 
