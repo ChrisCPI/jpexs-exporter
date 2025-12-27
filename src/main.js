@@ -228,7 +228,14 @@ try {
 
         const exportDir = OUTPUT_DIR ?? outputPath
 
-        await runCommand(`TexturePacker --multipack --trim-sprite-names --format phaser --algorithm Basic --sheet "${path.join(exportDir, `${swfName}-{n}.png`)}" --data "${path.join(exportDir, `${swfName}.json`)}" ${outputPath}`)
+        const jsonPath = path.join(exportDir, `${swfName}.json`)
+
+        await runCommand(`TexturePacker --multipack --trim-sprite-names --format phaser --algorithm Basic --sheet "${path.join(exportDir, `${swfName}-{n}.png`)}" --data "${jsonPath}" ${outputPath}`)
+
+        // Re-stringify the JSON to remove whitespace
+        await fs.writeFile(jsonPath,
+            JSON.stringify(JSON.parse(await fs.readFile(jsonPath)))
+        )
     }
 
     if (!(DONT_PACK || SAVE_OUTPUT)) {
