@@ -34,7 +34,9 @@ The `.env` file has 4 variables that need set, most of which already have defaul
         Java: java -jar ffdec.jar
 ```
 - `CANVAS_SIZE` - The size (in pixels) at which to export each frame of the SWF. (This does not affect the scale of the frames, it only crops it.) Default is 400.
-- `SCALE_MULTIPLIER` - When the SVG frames are converted into PNG, the exporter will first resize them to be this number multiplied by the `CANVAS_SIZE`, and then scale them down. A higher number may yield better quality, but will use significantly more processing power. Default is 5.
+- `SCALE_MULTIPLIER` - When the SVG frames are converted into PNG, the exporter will first resize them to be this number multiplied by the `CANVAS_SIZE`, and then scale them down. Default is 5.
+   > [!CAUTION]  
+   > A higher number may yield better quality, but will use exponentially more processing power.
 - `PNG_COMPRESSION` - A number from 0-9 to indicate how much to compress each frame PNG. Higher number = more compression. Default is 6.
 
 ### Using the exporter
@@ -85,7 +87,7 @@ Examples:
 
 When you are done, simply input "`save`" into the terminal to save the SWF with the new colors.
 
-> [!TIP]  
+> [!CAUTION]  
 > This modifies the SWF in-place, so make sure you have a copy of it if you want to keep the original.
 
 > [!NOTE]  
