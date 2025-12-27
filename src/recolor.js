@@ -39,10 +39,10 @@ function rgbToHex(r, g, b) {
 }
 
 function hexToRGB(hex) {
-    const hexValue = hex.startsWith('#') ? hex.substring(1) : hex
+    let hexValue = hex.startsWith('#') ? hex.substring(1) : hex
 
     if (hexValue.length === 3) {
-        const [r, g, b] = hexValue
+        const [ r, g, b ] = hexValue
         hexValue = r + r + g + g + b + b
     }
 
@@ -132,13 +132,23 @@ try {
         console.log(`**********\n${msg}\n**********\n`)
     }
 
-    function typeOfNumber(str) {
-        const isInt = /^-?\d+$/.test(str)
-        const isHex = /^#?[0-9A-Fa-f]{6}$/.test(str)
+    function typeOfNumber(str = '') {
+        const ogStr = str
 
-        if (isInt) return 'int'
-        if (isHex) return 'hex'
-        return null
+        if (!str.startsWith('#')) str = `#${str}`
+
+        if (str.slice(1).length === 3) {
+            const [ h, r, g, b ] = str
+            str = h + r + r + g + g + b + b
+        }
+
+        const isHex = /^#?[0-9A-Fa-f]{6}$/.test(str)
+        if (isHex) return [ str.toUpperCase(), 'hex' ]
+
+        const isInt = /^-?\d+$/.test(ogStr)
+        if (isInt) return [ Number(ogStr), 'int' ]
+
+        return [ str, null ]
     }
 
     function setRecolorMap(hex1, hex2) {
@@ -199,34 +209,38 @@ try {
             return
         }
 
-        if (!secondColor.startsWith('#')) secondColor = '#' + secondColor.toUpperCase()
+        const [ color1, color1Type ] = typeOfNumber(firstColor)
+        const [ color2, color2Type ] = typeOfNumber(secondColor)
 
-        const firstColorType = typeOfNumber(firstColor)
-        const secondColorType = typeOfNumber(secondColor)
-
-        if (secondColorType !== 'hex') {
+        if (!color1Type) {
+            logNote('First color is not in the correct format!')
+            colorsQuestion()
+            return
+        }
+    
+        if (!color2Type) {
             logNote('Second color is not in the correct format!')
             colorsQuestion()
             return
         }
 
-        if (Number(firstColor) > 0 && Number(firstColor) <= collectedColors.length) {
-            setRecolorMap(collectedColors[firstColor - 1], secondColor)
-            logNote(`Sucessfully replaced color ${firstColor} with ${secondColor}`)
+        const color1I = color1Type === 'hex' ? collectedColors.indexOf(color1) : color1 - 1
+        const color2I = color2Type === 'hex' ? collectedColors.indexOf(color2) : color2 - 1
+
+        if (color1I < 0 || color1I >= collectedColors.length) {
+            logNote(`First color is not in range!`)
             colorsQuestion()
             return
         }
 
-        if (!firstColor.startsWith('#')) firstColor = '#' + firstColor.toUpperCase()
-
-        if (firstColorType !== 'hex') {
-            logNote('First color is not in the correct format!')
+        if (color2Type === 'int' && (color2I < 0 || color2I >= collectedColors.length)) {
+            logNote(`Second color is not in range!`)
             colorsQuestion()
             return
         }
         
-        setRecolorMap(collectedColors[collectedColors.indexOf(firstColor)], secondColor)
-        logNote(`Sucessfully replaced color ${firstColor} with ${secondColor}`)
+        setRecolorMap(collectedColors[color1I], color2Type === 'hex' ? color2 : collectedColors[color2I])
+        logNote(`Sucessfully replaced color ${color1} with ${color2}`)
         colorsQuestion()
     }
 
