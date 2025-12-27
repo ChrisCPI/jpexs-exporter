@@ -189,9 +189,8 @@ try {
             const pngOutput = sharp(svgBuffer).resize(CANVAS_SIZE * SCALE_MULTIPLIER).sharpen().png()
 
             const pngPath = path.join(fullPath, `${path.basename(file, '.svg')}.png`)
-            await fs.writeFile(pngPath, pngOutput)
 
-            const resized = sharp(await fs.readFile(pngPath))
+            const resized = sharp(await pngOutput.toBuffer())
                 .resize(CANVAS_SIZE, CANVAS_SIZE, { kernel: sharp.kernel.cubic })
                 .png({ compressionLevel: PNG_COMPRESSION })
             await fs.writeFile(pngPath, resized)
