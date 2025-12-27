@@ -121,7 +121,7 @@ try {
 
             text += '\n'
         }
-        text += 'Enter the number or hex code you want to change, followed by the new hex code.\n'
+        text += 'Enter the number or hex code you want to change, followed by the new hex code or number.\n'
         text += 'Examples (without quotes): "FFFF00 2E47AA", "2 F4F400"\n'
         text += 'After modifying colors, input "save" to save the SWF and exit the process. You can do Ctrl+C to exit at any time.'
         text += '\n> '
