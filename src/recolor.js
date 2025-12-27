@@ -51,6 +51,24 @@ function hexToRGB(hex) {
     return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 }
 }
 
+function timelineRecursion(obj, predicate) {
+    const results = []
+
+    function search(node, key) {
+        if (predicate(node, key)) {
+            results.push(node)
+        }
+
+        if (Array.isArray(node)) {
+            node.forEach(item => search(item, null))
+        } else if (node && typeof node === 'object') {
+            Object.keys(node).forEach(k => search(node[k], k))
+        }
+    }
+
+    search(obj, null)
+    return results
+}
 
 try {
     // For some reason the xml needs to exist first in order to work
@@ -67,30 +85,9 @@ try {
 
     const collectedColors = []
 
-    const shapes = timeline.filter(tag => tag.$.type === 'DefineShapeTag' && tag.shapes)
+    const allColors = timelineRecursion(timeline, (_, key) => key === 'color').map(obj => obj[0].$)
 
-    function forEachShape(callback = (color) => {}) {
-        for (const tag of shapes) {
-            for (const shape of tag.shapes) {
-                const fillStyles = shape.fillStyles
-                if (fillStyles) {
-                    for (const fill of fillStyles) {
-                        if (fill.fillStyles) {
-                            for (const fill2 of fill.fillStyles) {
-                                const items = fill2.item
-                                for (const item of items) {
-                                    const color = item.color[0].$
-                                    callback(color)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    forEachShape(({red, green, blue}) => {
+    allColors.forEach(({ red, green, blue }) => {
         const hex = rgbToHex(red, green, blue)
         if (!collectedColors.includes(hex)) {
             collectedColors.push(hex)
@@ -174,7 +171,7 @@ try {
 
             console.log('Saving SWF...')
 
-            forEachShape(color => {
+            allColors.forEach(color => {
                 const key = `${color.red},${color.green},${color.blue}`
                 if (key in recolorMap) {
                     const [ r, g, b ] = recolorMap[key].split(',')
