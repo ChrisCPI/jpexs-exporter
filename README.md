@@ -35,8 +35,8 @@ The `.env` file has 4 variables that need set, most of which already have defaul
 ```
 - `CANVAS_SIZE` - The size (in pixels) at which to export each frame of the SWF. (This does not affect the scale of the frames, it only crops it.) Default is 400.
 - `SCALE_MULTIPLIER` - When the SVG frames are converted into PNG, the exporter will first resize them to be this number multiplied by the `CANVAS_SIZE`, and then scale them down. Default is 5.
-   > [!CAUTION]  
-   > A higher number may yield better quality, but will use exponentially more processing power.
+> [!CAUTION]  
+> A higher `SCALE_MULTIPLIER` number may yield better quality, but will use exponentially more processing power.
 - `PNG_COMPRESSION` - A number from 0-9 to indicate how much to compress each frame PNG. Higher number = more compression. Default is 6.
 
 ### Using the exporter
@@ -59,7 +59,7 @@ npm run export -- /absolute/path/to/item.swf --so --od /path/to/desired/director
 
 The exports can be found in the `exports` directory in the root of this repository, where each subdirectory is the SWF name. The individual frame PNGs will always go here, however the directory of the texture sheet can be defined with `--outputdir`/`--od` when running the command.
 
-> [!CAUTION]  
+> [!NOTE]  
 > This is ultimately inferior to exporting via Flash, but its up to you how much the fine details of the sprites matter.
 
 > [!NOTE]  
@@ -94,4 +94,4 @@ When you are done, simply input "`save`" into the terminal to save the SWF with 
 > All colors (fills, lines, gradients) found in the SWF are listed with no differentiation.
 
 > [!NOTE]  
-> Does not currently support different alpha values besides 1.
+> Currently, the script does not account for alpha on colors. Alpha values remain as-is when recolored.

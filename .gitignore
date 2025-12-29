@@ -22,8 +22,6 @@ jspm_packages/
 temp__/
 exports/
 
-assets/desktop.ini
-
 **/.DS_Store
 
 # vscode settings

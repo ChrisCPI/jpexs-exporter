@@ -98,7 +98,10 @@ try {
 
     const charDepthIdMap = {}
 
-    let prevLength = null
+    const uniqueFramesMap = {}
+
+    let prevLength = Infinity
+    let lastUniqueFrame = 1
 
     const exportCallbacks = []
 
@@ -127,20 +130,37 @@ try {
         const tagsOnThisFrame = timeline.slice(0, ftIndex)
         timeline.splice(0, ftIndex + 1)
 
-        if (timeline.length === prevLength) {
-            console.log('Skipping this frame, because there were no new changes on the timeline')
-        }
-
-        prevLength = timeline.length
-
-        const placeObjectTags = tagsOnThisFrame.filter(item => item.$?.type === 'PlaceObject2Tag')
-
-        if (placeObjectTags.length < 1) {
-            console.log('Skipping this frame, because there were no detected objects placed')
+        // If the length is 1, it should mean its just the ShowFrame tag
+        if (prevLength - timeline.length <= 1) {
+            console.log(`This frame is not unique; its output will be copied from frame ${lastUniqueFrame}`)
+            uniqueFramesMap[currentFrame] = lastUniqueFrame
+            prevLength = timeline.length
             continue
         }
 
+        prevLength = timeline.length
+        lastUniqueFrame = currentFrame
+
+        const removeObjectTags = tagsOnThisFrame.filter(item => item.$?.type === 'RemoveObject2Tag')
+
+        for (const tag of removeObjectTags) {
+            delete charDepthIdMap[tag.$.depth]
+        }
+
+        const placeObjectTags = tagsOnThisFrame.filter(item => item.$?.type === 'PlaceObject2Tag')
+
         let sublength = 0
+
+        for (const tag of placeObjectTags) {
+            charDepthIdMap[tag.$.depth] = tag.$.characterId === '0'
+                ? charDepthIdMap[tag.$.depth]
+                : tag.$.characterId
+        }
+
+        if (Object.keys(charDepthIdMap).length === 0) {
+            console.log('Skipping this frame, because there are no objects placed')
+            continue
+        }
 
         if (currentFrame in sublengthMap) {
             sublength = sublengthMap[currentFrame]
@@ -149,14 +169,8 @@ try {
             // this is what we will use as the sublength for the export
             const frameLengths = []
 
-            for (const tag of placeObjectTags) {
-                if (tag.$?.characterId === '0') {
-                    tag.$.characterId = charDepthIdMap[tag.$.depth]
-                }
-
-                charDepthIdMap[tag.$.depth] = tag.$.characterId
-
-                const defineSprite = timelineSafe.find(item => item.$?.type === 'DefineSpriteTag' && item.$?.spriteId === tag.$?.characterId)
+            for (const dpt in charDepthIdMap) {
+                const defineSprite = timelineSafe.find(item => item.$?.type === 'DefineSpriteTag' && item.$?.spriteId === charDepthIdMap[dpt])
                 if (!defineSprite) continue
                 frameLengths.push(Number(defineSprite.$.frameCount))
             }
@@ -221,6 +235,36 @@ try {
     }
 
     await Promise.all(conversions)
+
+    /**
+     * For optimization, if any frames are the same
+     * (such as the gap between frame 30 and the secret frame),
+     * then the output of those duplicate frames will be copied from the frame
+     * where the objects were first added on.
+     */
+    if (Object.keys(uniqueFramesMap).length > 0) {
+        console.log('PROCESSING UNIQUE FRAMES')
+        const outputDir = await fs.readdir(outputPath, { withFileTypes: true })
+
+        for (let frame = 1; frame <= totalFrames; frame++) {
+            if (frame in uniqueFramesMap) {
+                const lastUniqueFrame = uniqueFramesMap[frame].toString()
+
+                console.log(`Copying output of frame ${lastUniqueFrame} to frame ${frame}`)
+
+                const files = outputDir.filter(dir => path.basename(dir.name, '.png').split('_')[0] === lastUniqueFrame)
+
+                for (const file of files) {
+                    const newName = file.name.split('_')
+                    newName[0] = frame
+                    await fs.copyFile(
+                        path.join(file.parentPath, file.name),
+                        path.join(file.parentPath, newName.join('_'))
+                    )
+                }
+            }
+        }
+    }
 
     if (!DONT_PACK) {
         console.log('Packing with TexturePacker...')
