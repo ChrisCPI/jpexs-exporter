@@ -1,17 +1,13 @@
 import { exec } from 'child_process'
+import { promisify } from 'util'
 import fs from 'fs/promises'
 import { parseString } from 'xml2js'
 
+const run = promisify(exec)
+const parseXML = promisify(parseString)
+
 export async function runCommand(command) {
-    return new Promise((resolve, reject) => {
-        exec(command, (err, stdout, stder) => {
-            if (err) {
-                reject(err)
-                return
-            }
-            resolve(stdout.trim())
-        })
-    })
+   return (await run(command)).stdout.trim()
 }
 
 export async function ffdecCommand(command) {
@@ -31,14 +27,5 @@ export async function directoryExists(path) {
 }
 
 export async function parseXMLToJSON(xmlPath) {
-    const xml = await fs.readFile(xmlPath, 'utf8')
-    return new Promise((resolve, reject) => {
-        parseString(xml, (err, result) => {
-            if (err) {
-                reject(err)
-                return
-            }
-            resolve(result)
-        })
-    })
+    return await parseXML(await fs.readFile(xmlPath, 'utf8'))
 }
