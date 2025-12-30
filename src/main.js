@@ -152,9 +152,9 @@ try {
         let sublength = 0
 
         for (const tag of placeObjectTags) {
-            charDepthIdMap[tag.$.depth] = tag.$.characterId === '0'
-                ? charDepthIdMap[tag.$.depth]
-                : tag.$.characterId
+            if (tag.$.characterId !== '0') {
+                charDepthIdMap[tag.$.depth] = tag.$.characterId
+            }
         }
 
         if (Object.keys(charDepthIdMap).length === 0) {
@@ -246,22 +246,20 @@ try {
         console.log('PROCESSING UNIQUE FRAMES')
         const outputDir = await fs.readdir(outputPath, { withFileTypes: true })
 
-        for (let frame = 1; frame <= totalFrames; frame++) {
-            if (frame in uniqueFramesMap) {
-                const lastUniqueFrame = uniqueFramesMap[frame].toString()
+        for (const frame in uniqueFramesMap) {
+            const lastUniqueFrame = uniqueFramesMap[frame].toString()
 
-                console.log(`Copying output of frame ${lastUniqueFrame} to frame ${frame}`)
+            console.log(`Copying output of frame ${lastUniqueFrame} to frame ${frame}`)
 
-                const files = outputDir.filter(dir => path.basename(dir.name, '.png').split('_')[0] === lastUniqueFrame)
+            const files = outputDir.filter(dir => path.basename(dir.name, '.png').split('_')[0] === lastUniqueFrame)
 
-                for (const file of files) {
-                    const newName = file.name.split('_')
-                    newName[0] = frame
-                    await fs.copyFile(
-                        path.join(file.parentPath, file.name),
-                        path.join(file.parentPath, newName.join('_'))
-                    )
-                }
+            for (const file of files) {
+                const newName = file.name.split('_')
+                newName[0] = frame
+                await fs.copyFile(
+                    path.join(file.parentPath, file.name),
+                    path.join(file.parentPath, newName.join('_'))
+                )
             }
         }
     }
