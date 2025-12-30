@@ -1,15 +1,12 @@
 import fs from 'fs/promises'
 import path from 'path'
-import util from 'util'
 import { JSDOM } from 'jsdom'
-import { parseString } from 'xml2js'
 import sharp from 'sharp'
 import minimist from 'minimist'
 import pLimit from 'p-limit'
-import { runCommand, ffdecCommand, directoryExists } from './utils.js'
+import { runCommand, ffdecCommand, directoryExists, parseXMLToJSON } from './utils.js'
 
 const __dirname = process.cwd()
-const parseStringAsync = util.promisify(parseString)
 const args = minimist(process.argv.slice(2))
 const limit = pLimit(4)
 
@@ -56,25 +53,6 @@ const swfName = path.parse(SWF_PATH).name
 
 const XML_PATH = path.join(__dirname, tempDir, `${swfName}.xml`)
 
-async function parseXMLToJSON(xml) {
-    const XML = await fs.readFile(xml, 'utf8')
-    const result = await parseStringAsync(XML)
-
-    return result
-}
-
-async function updateSVGSizing(svgPath, width, height) {
-    const svgString = await fs.readFile(svgPath, 'utf8')
-
-    const dom = new JSDOM(svgString, { contentType: 'image/svg+xml' })
-    const svg = dom.window.document.querySelector('svg')
-
-    svg.setAttribute('viewBox', `${-(width / 2)} ${-(height / 2)} ${width} ${height}`)
-    svg.setAttribute('width', width)
-    svg.setAttribute('height', height)
-
-    return Buffer.from(dom.serialize())
-}
 
 try {
     // For some reason the xml needs to exist first in order to work
@@ -194,6 +172,19 @@ try {
     const entries = await fs.readdir(outputPath, { withFileTypes: true })
 
     const outputFiles = []
+
+    async function updateSVGSizing(svgPath, width, height) {
+        const svgString = await fs.readFile(svgPath, 'utf8')
+
+        const dom = new JSDOM(svgString, { contentType: 'image/svg+xml' })
+        const svg = dom.window.document.querySelector('svg')
+
+        svg.setAttribute('viewBox', `${-(width / 2)} ${-(height / 2)} ${width} ${height}`)
+        svg.setAttribute('width', width)
+        svg.setAttribute('height', height)
+
+        return Buffer.from(dom.serialize())
+    }
 
     async function convertSVGToPNG(file, fullPath) {
         if (path.extname(file) === '.svg') {

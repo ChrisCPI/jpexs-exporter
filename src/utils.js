@@ -1,5 +1,6 @@
 import { exec } from 'child_process'
 import fs from 'fs/promises'
+import { parseString } from 'xml2js'
 
 export async function runCommand(command) {
     return new Promise((resolve, reject) => {
@@ -27,4 +28,17 @@ export async function directoryExists(path) {
         }
         throw error
     }
+}
+
+export async function parseXMLToJSON(xmlPath) {
+    const xml = await fs.readFile(xmlPath, 'utf8')
+    return new Promise((resolve, reject) => {
+        parseString(xml, (err, result) => {
+            if (err) {
+                reject(err)
+                return
+            }
+            resolve(result)
+        })
+    })
 }

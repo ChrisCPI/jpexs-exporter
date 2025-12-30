@@ -1,14 +1,12 @@
 import fs from 'fs/promises'
 import path from 'path'
-import util from 'util'
 import readline from 'readline/promises'
 import chalk from 'chalk'
-import { parseString, Builder as xmlBuilder } from 'xml2js'
+import { Builder as xmlBuilder } from 'xml2js'
 import minimist from 'minimist'
-import { ffdecCommand, directoryExists } from './utils.js'
+import { ffdecCommand, directoryExists, parseXMLToJSON } from './utils.js'
 
 const __dirname = process.cwd()
-const parseStringAsync = util.promisify(parseString)
 const args = minimist(process.argv.slice(2))
 
 
@@ -26,13 +24,6 @@ const tempDir = 'temp__'
 const swfName = path.parse(SWF_PATH).name
 
 const XML_PATH = path.join(__dirname, tempDir, `${swfName}.xml`)
-
-async function parseXMLToJSON(xml) {
-    const XML = await fs.readFile(xml, 'utf8')
-    const result = await parseStringAsync(XML)
-
-    return result
-}
 
 function rgbToHex(r, g, b) {
     return '#' + (1 << 24 | Number(r) << 16 | Number(g) << 8 | Number(b)).toString(16).slice(1).toUpperCase()
