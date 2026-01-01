@@ -7,7 +7,7 @@ An exporter and recolor tool for SWFs.
 
 * [Node.js](https://nodejs.org/en/)
 * [Java](https://www.java.com/en/download/)
-* [JPEXS Free Flash Decompiler](https://github.com/jindrapetrik/jpexs-decompiler)
+* [JPEXS Free Flash Decompiler](https://github.com/jindrapetrik/jpexs-decompiler) (v.24.1.1 nightly build 3364, or higher)
 * [Texture Packer](https://www.codeandweb.com/texturepacker) (when opting to automatically pack)
 
 ### Installation
@@ -34,14 +34,16 @@ The `.env` file has 4 variables that need set, most of which already have defaul
         Java: java -jar ffdec.jar
 ```
 - `CANVAS_SIZE` - The size (in pixels) at which to export each frame of the SWF. (This does not affect the scale of the frames, it only crops it.) Default is 400.
-- `SCALE_MULTIPLIER` - When the SVG frames are converted into PNG, the exporter will first resize them to be this number multiplied by the `CANVAS_SIZE`, and then scale them down. A higher number may yield better quality, but will use significantly more processing power. Default is 5.
+- `SCALE_MULTIPLIER` - When the SVG frames are converted into PNG, the exporter will first resize them to be this number multiplied by the `CANVAS_SIZE`, and then scale them down. Default is 5.
+> [!CAUTION]  
+> A higher `SCALE_MULTIPLIER` number may yield better quality, but will use exponentially more processing power.
 - `PNG_COMPRESSION` - A number from 0-9 to indicate how much to compress each frame PNG. Higher number = more compression. Default is 6.
 
 ### Using the exporter
 
 In its most basic form, you can run this command to run the exporter:
 ```console
-npm run dev -- path/to/item.swf
+npm run export -- path/to/item.swf
 ```
 However, this can take a few arguments:
 - `--dontpack` (shorthand `--dp`) - Tells the exporter to not pack the files with TexturePacker. This will also not delete the individual frame PNGs when the process is done.
@@ -51,8 +53,8 @@ However, this can take a few arguments:
 
 Examples:
 ```console
-npm run dev -- ../relative/path/to/item.swf --dontpack --sl 8:5,12:4
-npm run dev -- /absolute/path/to/item.swf --so --od /path/to/desired/directory
+npm run export -- ../relative/path/to/item.swf --dontpack --sl 8:5,12:4
+npm run export -- /absolute/path/to/item.swf --so --od /path/to/desired/directory
 ```
 
 The exports can be found in the `exports` directory in the root of this repository, where each subdirectory is the SWF name. The individual frame PNGs will always go here, however the directory of the texture sheet can be defined with `--outputdir`/`--od` when running the command.
@@ -71,21 +73,25 @@ Run the `recolor` script, passing in the path to the SWF file as an argument:
 npm run recolor -- /path/to/item.swf
 ```
 
-This will launch a CLI-based interaction where you can replace colors. The script will list all of the fill colors that it could find. To replace a color, input a listed hex code OR the number associated with that hex code, followed by the hex code to replace it with.
+This will launch a CLI-based interaction where you can replace colors. The script will list all of the fill colors that it could find. To replace a color, input a listed hex code OR the number associated with that hex code, followed by the hex code to replace it with. The second argument can also be a number corresponding to an *original* color, to replace the first color with that color.
+
+The input checking is pretty generous, so you can input the hex codes in a variety of ways (with/without the "#", 3 or 6-digit codes, non-case sensitive).
 
 Examples:
 ```
 4 #FF0000
-#00FF00 #123ABC
+#00ff00 123ABC
+#abc 7
+2 6
 ```
 
 When you are done, simply input "`save`" into the terminal to save the SWF with the new colors.
 
-> [!NOTE]  
+> [!CAUTION]  
 > This modifies the SWF in-place, so make sure you have a copy of it if you want to keep the original.
 
 > [!NOTE]  
-> Does not currently support different alpha values besides 1.
+> All colors (fills, lines, gradients) found in the SWF are listed with no differentiation.
 
 > [!NOTE]  
-> Does not currently support stroke colors or gradients.
+> Currently, the script does not account for alpha on colors. Alpha values remain as-is when recolored.

@@ -1,14 +1,12 @@
 import fs from 'fs/promises'
 import path from 'path'
-import util from 'util'
 import readline from 'readline/promises'
 import chalk from 'chalk'
-import { parseString, Builder as xmlBuilder } from 'xml2js'
+import { Builder as xmlBuilder } from 'xml2js'
 import minimist from 'minimist'
-import { ffdecCommand, directoryExists } from './utils.js'
+import { ffdecCommand, directoryExists, parseXMLToJSON } from './utils.js'
 
 const __dirname = process.cwd()
-const parseStringAsync = util.promisify(parseString)
 const args = minimist(process.argv.slice(2))
 
 
@@ -21,28 +19,21 @@ if (!SWF_PATH) {
 
 const SWF_PATH_JOINED = path.isAbsolute(SWF_PATH) ? SWF_PATH : path.join(__dirname, SWF_PATH)
 
-const tempDir = 'temp__'
+const tempDir = '.temp__'
 
 const swfName = path.parse(SWF_PATH).name
 
 const XML_PATH = path.join(__dirname, tempDir, `${swfName}.xml`)
-
-async function parseXMLToJSON(xml) {
-    const XML = await fs.readFile(xml, 'utf8')
-    const result = await parseStringAsync(XML)
-
-    return result
-}
 
 function rgbToHex(r, g, b) {
     return '#' + (1 << 24 | Number(r) << 16 | Number(g) << 8 | Number(b)).toString(16).slice(1).toUpperCase()
 }
 
 function hexToRGB(hex) {
-    const hexValue = hex.startsWith('#') ? hex.substring(1) : hex
+    let hexValue = hex.startsWith('#') ? hex.substring(1) : hex
 
     if (hexValue.length === 3) {
-        const [r, g, b] = hexValue
+        const [ r, g, b ] = hexValue
         hexValue = r + r + g + g + b + b
     }
 
@@ -51,6 +42,24 @@ function hexToRGB(hex) {
     return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 }
 }
 
+function timelineRecursion(obj, predicate) {
+    const results = []
+
+    function search(node, key) {
+        if (predicate(node, key)) {
+            results.push(node)
+        }
+
+        if (Array.isArray(node)) {
+            node.forEach(item => search(item, null))
+        } else if (node && typeof node === 'object') {
+            Object.keys(node).forEach(k => search(node[k], k))
+        }
+    }
+
+    search(obj, null)
+    return results
+}
 
 try {
     // For some reason the xml needs to exist first in order to work
@@ -67,30 +76,9 @@ try {
 
     const collectedColors = []
 
-    const shapes = timeline.filter(tag => tag.$.type === 'DefineShapeTag' && tag.shapes)
+    const allColors = timelineRecursion(timeline, (_, key) => key === 'color').map(obj => obj[0].$)
 
-    function forEachShape(callback = (color) => {}) {
-        for (const tag of shapes) {
-            for (const shape of tag.shapes) {
-                const fillStyles = shape.fillStyles
-                if (fillStyles) {
-                    for (const fill of fillStyles) {
-                        if (fill.fillStyles) {
-                            for (const fill2 of fill.fillStyles) {
-                                const items = fill2.item
-                                for (const item of items) {
-                                    const color = item.color[0].$
-                                    callback(color)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    forEachShape(({red, green, blue}) => {
+    allColors.forEach(({ red, green, blue }) => {
         const hex = rgbToHex(red, green, blue)
         if (!collectedColors.includes(hex)) {
             collectedColors.push(hex)
@@ -124,7 +112,7 @@ try {
 
             text += '\n'
         }
-        text += 'Enter the number or hex code you want to change, followed by the new hex code.\n'
+        text += 'Enter the number or hex code you want to change, followed by the new hex code or number.\n'
         text += 'Examples (without quotes): "FFFF00 2E47AA", "2 F4F400"\n'
         text += 'After modifying colors, input "save" to save the SWF and exit the process. You can do Ctrl+C to exit at any time.'
         text += '\n> '
@@ -135,13 +123,23 @@ try {
         console.log(`**********\n${msg}\n**********\n`)
     }
 
-    function typeOfNumber(str) {
-        const isInt = /^-?\d+$/.test(str)
-        const isHex = /^#?[0-9A-Fa-f]{6}$/.test(str)
+    function typeOfNumber(str = '') {
+        const ogStr = str
 
-        if (isInt) return 'int'
-        if (isHex) return 'hex'
-        return null
+        if (!str.startsWith('#')) str = `#${str}`
+
+        if (str.slice(1).length === 3) {
+            const [ h, r, g, b ] = str
+            str = h + r + r + g + g + b + b
+        }
+
+        const isHex = /^#?[0-9A-Fa-f]{6}$/.test(str)
+        if (isHex) return [ str.toUpperCase(), 'hex' ]
+
+        const isInt = /^-?\d+$/.test(ogStr)
+        if (isInt) return [ Number(ogStr), 'int' ]
+
+        return [ str, null ]
     }
 
     function setRecolorMap(hex1, hex2) {
@@ -168,12 +166,13 @@ try {
 
             if (Object.keys(recolorMap).length < 1) {
                 console.log('No changes were made to the SWF.')
+                await fs.rm(path.join(__dirname, tempDir), { recursive: true })
                 return
             }
 
             console.log('Saving SWF...')
 
-            forEachShape(color => {
+            allColors.forEach(color => {
                 const key = `${color.red},${color.green},${color.blue}`
                 if (key in recolorMap) {
                     const [ r, g, b ] = recolorMap[key].split(',')
@@ -201,34 +200,38 @@ try {
             return
         }
 
-        if (!secondColor.startsWith('#')) secondColor = '#' + secondColor.toUpperCase()
+        const [ color1, color1Type ] = typeOfNumber(firstColor)
+        const [ color2, color2Type ] = typeOfNumber(secondColor)
 
-        const firstColorType = typeOfNumber(firstColor)
-        const secondColorType = typeOfNumber(secondColor)
-
-        if (secondColorType !== 'hex') {
+        if (!color1Type) {
+            logNote('First color is not in the correct format!')
+            colorsQuestion()
+            return
+        }
+    
+        if (!color2Type) {
             logNote('Second color is not in the correct format!')
             colorsQuestion()
             return
         }
 
-        if (Number(firstColor) > 0 && Number(firstColor) <= collectedColors.length) {
-            setRecolorMap(collectedColors[firstColor - 1], secondColor)
-            logNote(`Sucessfully replaced color ${firstColor} with ${secondColor}`)
+        const color1I = color1Type === 'hex' ? collectedColors.indexOf(color1) : color1 - 1
+        const color2I = color2Type === 'hex' ? collectedColors.indexOf(color2) : color2 - 1
+
+        if (color1I < 0 || color1I >= collectedColors.length) {
+            logNote(`First color is not in range!`)
             colorsQuestion()
             return
         }
 
-        if (!firstColor.startsWith('#')) firstColor = '#' + firstColor.toUpperCase()
-
-        if (firstColorType !== 'hex') {
-            logNote('First color is not in the correct format!')
+        if (color2Type === 'int' && (color2I < 0 || color2I >= collectedColors.length)) {
+            logNote(`Second color is not in range!`)
             colorsQuestion()
             return
         }
         
-        setRecolorMap(collectedColors[collectedColors.indexOf(firstColor)], secondColor)
-        logNote(`Sucessfully replaced color ${firstColor} with ${secondColor}`)
+        setRecolorMap(collectedColors[color1I], color2Type === 'hex' ? color2 : collectedColors[color2I])
+        logNote(`Sucessfully replaced color ${color1} with ${color2}`)
         colorsQuestion()
     }
 

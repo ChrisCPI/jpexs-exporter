@@ -1,15 +1,12 @@
 import fs from 'fs/promises'
 import path from 'path'
-import util from 'util'
 import { JSDOM } from 'jsdom'
-import { parseString } from 'xml2js'
 import sharp from 'sharp'
 import minimist from 'minimist'
 import pLimit from 'p-limit'
-import { runCommand, ffdecCommand, directoryExists } from './utils.js'
+import { runCommand, ffdecCommand, directoryExists, parseXMLToJSON } from './utils.js'
 
 const __dirname = process.cwd()
-const parseStringAsync = util.promisify(parseString)
 const args = minimist(process.argv.slice(2))
 const limit = pLimit(4)
 
@@ -50,31 +47,12 @@ const sublengthMap = function() {
     return {}
 }()
 
-const tempDir = 'temp__'
+const tempDir = '.temp__'
 
 const swfName = path.parse(SWF_PATH).name
 
 const XML_PATH = path.join(__dirname, tempDir, `${swfName}.xml`)
 
-async function parseXMLToJSON(xml) {
-    const XML = await fs.readFile(xml, 'utf8')
-    const result = await parseStringAsync(XML)
-
-    return result
-}
-
-async function updateSVGSizing(svgPath, width, height) {
-    const svgString = await fs.readFile(svgPath, 'utf8')
-
-    const dom = new JSDOM(svgString, { contentType: 'image/svg+xml' })
-    const svg = dom.window.document.querySelector('svg')
-
-    svg.setAttribute('viewBox', `${-(width / 2)} ${-(height / 2)} ${width} ${height}`)
-    svg.setAttribute('width', width)
-    svg.setAttribute('height', height)
-
-    return Buffer.from(dom.serialize())
-}
 
 try {
     // For some reason the xml needs to exist first in order to work
@@ -98,7 +76,10 @@ try {
 
     const charDepthIdMap = {}
 
-    let prevLength = null
+    const uniqueFramesMap = {}
+
+    let prevLength = Infinity
+    let lastUniqueFrame = 1
 
     const exportCallbacks = []
 
@@ -127,20 +108,37 @@ try {
         const tagsOnThisFrame = timeline.slice(0, ftIndex)
         timeline.splice(0, ftIndex + 1)
 
-        if (timeline.length === prevLength) {
-            console.log('Skipping this frame, because there were no new changes on the timeline')
-        }
-
-        prevLength = timeline.length
-
-        const placeObjectTags = tagsOnThisFrame.filter(item => item.$?.type === 'PlaceObject2Tag')
-
-        if (placeObjectTags.length < 1) {
-            console.log('Skipping this frame, because there were no detected objects placed')
+        // If the length is 1, it should mean its just the ShowFrame tag
+        if (prevLength - timeline.length <= 1) {
+            console.log(`This frame is not unique; its output will be copied from frame ${lastUniqueFrame}`)
+            uniqueFramesMap[currentFrame] = lastUniqueFrame
+            prevLength = timeline.length
             continue
         }
 
+        prevLength = timeline.length
+        lastUniqueFrame = currentFrame
+
+        const removeObjectTags = tagsOnThisFrame.filter(item => item.$?.type === 'RemoveObject2Tag')
+
+        for (const tag of removeObjectTags) {
+            delete charDepthIdMap[tag.$.depth]
+        }
+
+        const placeObjectTags = tagsOnThisFrame.filter(item => item.$?.type === 'PlaceObject2Tag')
+
         let sublength = 0
+
+        for (const tag of placeObjectTags) {
+            if (tag.$.characterId !== '0') {
+                charDepthIdMap[tag.$.depth] = tag.$.characterId
+            }
+        }
+
+        if (Object.keys(charDepthIdMap).length === 0) {
+            console.log('Skipping this frame, because there are no objects placed')
+            continue
+        }
 
         if (currentFrame in sublengthMap) {
             sublength = sublengthMap[currentFrame]
@@ -149,14 +147,8 @@ try {
             // this is what we will use as the sublength for the export
             const frameLengths = []
 
-            for (const tag of placeObjectTags) {
-                if (tag.$?.characterId === '0') {
-                    tag.$.characterId = charDepthIdMap[tag.$.depth]
-                }
-
-                charDepthIdMap[tag.$.depth] = tag.$.characterId
-
-                const defineSprite = timelineSafe.find(item => item.$?.type === 'DefineSpriteTag' && item.$?.spriteId === tag.$?.characterId)
+            for (const dpt in charDepthIdMap) {
+                const defineSprite = timelineSafe.find(item => item.$?.type === 'DefineSpriteTag' && item.$?.spriteId === charDepthIdMap[dpt])
                 if (!defineSprite) continue
                 frameLengths.push(Number(defineSprite.$.frameCount))
             }
@@ -181,6 +173,19 @@ try {
 
     const outputFiles = []
 
+    async function updateSVGSizing(svgPath, width, height) {
+        const svgString = await fs.readFile(svgPath, 'utf8')
+
+        const dom = new JSDOM(svgString, { contentType: 'image/svg+xml' })
+        const svg = dom.window.document.querySelector('svg')
+
+        svg.setAttribute('viewBox', `${-(width / 2)} ${-(height / 2)} ${width} ${height}`)
+        svg.setAttribute('width', width)
+        svg.setAttribute('height', height)
+
+        return Buffer.from(dom.serialize())
+    }
+
     async function convertSVGToPNG(file, fullPath) {
         if (path.extname(file) === '.svg') {
             const svgPath = path.join(fullPath, file)
@@ -189,9 +194,8 @@ try {
             const pngOutput = sharp(svgBuffer).resize(CANVAS_SIZE * SCALE_MULTIPLIER).sharpen().png()
 
             const pngPath = path.join(fullPath, `${path.basename(file, '.svg')}.png`)
-            await fs.writeFile(pngPath, pngOutput)
 
-            const resized = sharp(await fs.readFile(pngPath))
+            const resized = sharp(await pngOutput.toBuffer())
                 .resize(CANVAS_SIZE, CANVAS_SIZE, { kernel: sharp.kernel.cubic })
                 .png({ compressionLevel: PNG_COMPRESSION })
             await fs.writeFile(pngPath, resized)
@@ -223,12 +227,47 @@ try {
 
     await Promise.all(conversions)
 
+    /**
+     * For optimization, if any frames are the same
+     * (such as the gap between frame 30 and the secret frame),
+     * then the output of those duplicate frames will be copied from the frame
+     * where the objects were first added on.
+     */
+    if (Object.keys(uniqueFramesMap).length > 0) {
+        console.log('PROCESSING UNIQUE FRAMES')
+        const outputDir = await fs.readdir(outputPath, { withFileTypes: true })
+
+        for (const frame in uniqueFramesMap) {
+            const lastUniqueFrame = uniqueFramesMap[frame].toString()
+
+            console.log(`Copying output of frame ${lastUniqueFrame} to frame ${frame}`)
+
+            const files = outputDir.filter(dir => path.basename(dir.name, '.png').split('_')[0] === lastUniqueFrame)
+
+            for (const file of files) {
+                const newName = file.name.split('_')
+                newName[0] = frame
+                await fs.copyFile(
+                    path.join(file.parentPath, file.name),
+                    path.join(file.parentPath, newName.join('_'))
+                )
+            }
+        }
+    }
+
     if (!DONT_PACK) {
         console.log('Packing with TexturePacker...')
 
         const exportDir = OUTPUT_DIR ?? outputPath
 
-        await runCommand(`TexturePacker --multipack --trim-sprite-names --format phaser --algorithm Basic --sheet "${path.join(exportDir, `${swfName}-{n}.png`)}" --data "${path.join(exportDir, `${swfName}.json`)}" ${outputPath}`)
+        const jsonPath = path.join(exportDir, `${swfName}.json`)
+
+        await runCommand(`TexturePacker --multipack --trim-sprite-names --format phaser --algorithm Basic --sheet "${path.join(exportDir, `${swfName}-{n}.png`)}" --data "${jsonPath}" ${outputPath}`)
+
+        // Re-stringify the JSON to remove whitespace
+        await fs.writeFile(jsonPath,
+            JSON.stringify(JSON.parse(await fs.readFile(jsonPath)))
+        )
     }
 
     if (!(DONT_PACK || SAVE_OUTPUT)) {

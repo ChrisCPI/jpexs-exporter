@@ -10,7 +10,7 @@
   },
   "type": "module",
   "scripts": {
-    "dev": "node --env-file=.env ./src/main.js",
+    "export": "node --env-file=.env ./src/main.js",
     "recolor": "node --env-file=.env ./src/recolor.js"
   }
 }

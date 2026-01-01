@@ -19,10 +19,8 @@ jspm_packages/
 
 .env
 
-temp__/
+.temp__/
 exports/
-
-assets/desktop.ini
 
 **/.DS_Store
 
