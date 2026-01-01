@@ -47,7 +47,7 @@ const sublengthMap = function() {
     return {}
 }()
 
-const tempDir = 'temp__'
+const tempDir = '.temp__'
 
 const swfName = path.parse(SWF_PATH).name
 

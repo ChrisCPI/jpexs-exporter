@@ -19,7 +19,7 @@ if (!SWF_PATH) {
 
 const SWF_PATH_JOINED = path.isAbsolute(SWF_PATH) ? SWF_PATH : path.join(__dirname, SWF_PATH)
 
-const tempDir = 'temp__'
+const tempDir = '.temp__'
 
 const swfName = path.parse(SWF_PATH).name
 

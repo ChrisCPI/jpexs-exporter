@@ -19,7 +19,7 @@ jspm_packages/
 
 .env
 
-temp__/
+.temp__/
 exports/
 
 **/.DS_Store
